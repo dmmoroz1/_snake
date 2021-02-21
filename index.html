@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Snake</title>
+
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<snake.body>
+    <div id="app" v-cloak>
+        <div class="start" :style="{ minWidth: field.width + 'px', minHeight: field.height + 'px' }" v-if="!timer.instance">
+            <span v-if="!timer.counter">
+                <p>Use arrows to control</p>
+                <p>Press any arrow to start</p>
+            </span>
+            <span v-else>
+                <p>Game over</p>
+                <p>Your score: {{ score }}</p>
+            </span>
+        </div>
+
+        <div class="wrapper" :style="{ minWidth: field.width + 'px', minHeight: field.height + 'px' }">
+            <div class="snake">
+                <ul class="snake__snake.body" :style="{ width: field.width + 'px', height: field.height + 'px' }">
+                    <li class="snake__block"
+                        v-for="block in snake.body" :key="block.id" 
+                        :style="{ top: block.y + 'px', left: block.x + 'px', width: snake.blockSize + 'px', height: snake.blockSize + 'px' }"
+                    ><span></span></li>
+                </ul>
+                <div class="snake__food" :style="{ top: food.y + 'px', left: food.x + 'px', width: snake.blockSize + 'px', height: snake.blockSize + 'px' }">
+                    <span></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/vue.min.js"></script>
+
+    <script>
+        var vm = new Vue({
+            el: '#app',
+            data: {
+                timer: {
+                    instance: null,
+                    timeout: 500,
+                    counter: 0,
+                },
+
+                commands: [],
+
+                routes: {
+                    37: { x: -1, y: 0 }, // left
+                    38: { x: 0, y: -1 }, // up
+                    39: { x: 1, y: 0 },  // right
+                    40: { x: 0, y: 1 },  // down
+                },
+                step: { x: 1, y: 0 },
+
+                // field
+                width: 15,
+                height: 10,
+
+                snake: {
+                    initSize: 4,
+                    blockSize: 40,
+                    body: [],
+                },
+
+                food: {}
+            },
+            methods: {
+                timerStart() {
+                    if ( !this.timer.instance ) {
+                        this.timer.instance = setInterval(() => {
+                            this.doStep()
+                        }, this.timer.timeout)
+                    }
+                },
+
+                timerStop() {
+                    if ( this.timer.instance ) {
+                        clearInterval(this.timer.instance)
+                        this.timer.instance = null
+
+                        window.removeEventListener('keydown', this.keydownHandler)
+                    }
+                },
+
+                keydownHandler(e) {
+
+                    if ( !this.timer.instance && !this.timer.counter ) {
+                        this.timerStart()
+                    }
+                    else if ( e.keyCode >= 37 && e.keyCode <= 40 ) {
+                        const r = this.routes[ e.keyCode ]
+                        const c = this.commands.length ? this.routes[ this.commands[ this.commands.length - 1 ] ] : this.step
+                        
+                        // проверка на разворот и повтор команды
+                        if ( r.x !== c.x && r.x + c.x !== 0 && r.y !== c.y && r.y + c.y !== 0 ) {
+                            this.commands.push(e.keyCode)
+                        }
+                    }
+                },
+
+                getRandomInt(min, max) {
+                    min = Math.ceil(min);
+                    max = Math.floor(max);
+                    return Math.floor(Math.random() * (max - min)) + min;
+                },
+
+                setFood() {
+                    const o = {
+                        x: this.getRandomInt(0, this.width) * this.snake.blockSize,
+                        y: this.getRandomInt(0, this.height) * this.snake.blockSize,
+                    }
+
+                    for ( let i = 0; i < this.snake.body.length; i++ ) {
+                        if ( this.snake.body[i].x === o.x && this.snake.body[i].y === o.y ) {
+                            return this.setFood()
+                        }
+                    }
+
+                    return o;
+                },
+
+                doStep() {
+                    this.timer.counter += 1
+
+                    if ( s = this.commands.shift() ) {
+                        this.step = this.routes[s]
+                    }
+
+                    const next = {
+                        id: ++this.head.id,
+                        x: this.head.x + this.step.x * this.snake.blockSize,
+                        y: this.head.y + this.step.y * this.snake.blockSize
+                    }
+
+                    if ( this.isFood(next) ) {
+                        this.snake.body.push(next)
+                        this.food = this.setFood()
+                    }
+                    else if ( this.isEmpty(next) ) {
+                        this.snake.body.push(next)
+                        this.snake.body.shift()
+                    }
+                    else {
+                        this.timerStop()
+                    }
+                },
+
+                isFood(next) {
+                    return next.x === this.food.x && next.y === this.food.y
+                },
+
+                isEmpty(next) {
+                    // хвост на пути
+                    for ( let i = 1; i < this.snake.body.length; i++ ) {
+                        if ( this.snake.body[i].x === next.x && this.snake.body[i].y === next.y ) {
+                            return false
+                        }
+                    }
+
+                    // выход за пределы поля
+                    if ( next.x < 0 || next.x >= this.field.width || next.y < 0 || next.y >= this.field.height ) {
+                        return false
+                    }
+
+                    return true
+                },
+                
+            },
+            computed: {
+                field() {
+                    return {
+                        width: this.snake.blockSize * this.width,
+                        height: this.snake.blockSize * this.height,
+                    }
+                },
+                head() {
+                    return this.snake.body[ this.snake.body.length - 1 ]
+                },
+                score() {
+                    return this.snake.body.length - this.snake.initSize
+                }
+            },
+            created() {
+                for (let i = 0; i < this.snake.initSize; i++ ) {
+                    this.snake.body.push({
+                        id: this.snake.body.length,
+                        x: i * this.snake.blockSize,
+                        y: 0,
+                    })
+                }
+
+                this.food = this.setFood()
+
+                window.addEventListener('keydown', this.keydownHandler)
+            },
+            destroyed() {
+                this.timerStop()
+            }
+        })
+    </script>
+</snake.body>
+</html>
